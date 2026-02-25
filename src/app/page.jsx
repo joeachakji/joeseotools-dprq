@@ -1,6 +1,5 @@
 "use client";
-import React from "react";
-
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 function MainComponent() {
   const [keywords, setKeywords] = useState([]);
   const [newKeyword, setNewKeyword] = useState("");
