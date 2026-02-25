@@ -1,44 +1,56 @@
-async function handler({ projectId }) {
+import catalyst from 'zcatalyst-sdk-node';
+import { NextResponse } from 'next/server';
+
+async function handler(req) {
+  const { projectId } = await req.json();
+
   if (!projectId) {
-    throw new Error("Project ID is required");
+    return NextResponse.json({ error: "Project ID is required" }, { status: 400 });
   }
 
   try {
-    const keywords = await sql`
-      SELECT 
-        k.*,
-        kr_com.position as google_com_position,
-        kr_com.checked_at as google_com_checked_at,
-        kr_ca.position as google_ca_position,
-        kr_ca.checked_at as google_ca_checked_at,
-        GREATEST(COALESCE(kr_com.checked_at, null), 
-                COALESCE(kr_ca.checked_at, null)) as last_checked
-      FROM keywords k
-      LEFT JOIN LATERAL (
-        SELECT position, checked_at
-        FROM keyword_rankings
-        WHERE keyword_id = k.id
-        AND domain = 'google.com'
-        ORDER BY checked_at DESC
-        LIMIT 1
-      ) kr_com ON true
-      LEFT JOIN LATERAL (
-        SELECT position, checked_at
-        FROM keyword_rankings
-        WHERE keyword_id = k.id
-        AND domain = 'google.ca'
-        ORDER BY checked_at DESC
-        LIMIT 1
-      ) kr_ca ON true
-      WHERE k.project_id = ${projectId}
-      ORDER BY k.created_at DESC
-    `;
+    const app = catalyst.initialize(req);
+    const zcql = app.zcql();
 
-    return keywords;
+    const keywords = await zcql.executeZCQLQuery(
+      `SELECT * FROM keywords WHERE project_id = ${projectId}`
+    );
+
+    const keywordsWithRankings = await Promise.all(
+      keywords.map(async (k) => {
+        const keywordId = k.keywords.ROWID;
+
+        const comRankings = await zcql.executeZCQLQuery(
+          `SELECT * FROM keyword_rankings WHERE keyword_id = ${keywordId} AND domain = 'google.com' ORDER BY checked_at DESC LIMIT 1`
+        );
+
+        const caRankings = await zcql.executeZCQLQuery(
+          `SELECT * FROM keyword_rankings WHERE keyword_id = ${keywordId} AND domain = 'google.ca' ORDER BY checked_at DESC LIMIT 1`
+        );
+
+        const comRanking = comRankings[0]?.keyword_rankings;
+        const caRanking = caRankings[0]?.keyword_rankings;
+
+        return {
+          id: keywordId,
+          keyword: k.keywords.keyword,
+          project_id: k.keywords.project_id,
+          google_com_position: comRanking?.position || null,
+          google_com_checked_at: comRanking?.checked_at || null,
+          google_ca_position: caRanking?.position || null,
+          google_ca_checked_at: caRanking?.checked_at || null,
+          last_checked: comRanking?.checked_at || caRanking?.checked_at || null,
+        };
+      })
+    );
+
+    return NextResponse.json(keywordsWithRankings);
   } catch (error) {
-    throw new Error("Failed to list keywords");
+    console.error("Error listing keywords:", error);
+    return NextResponse.json({ error: "Failed to list keywords" }, { status: 500 });
   }
 }
-export async function POST(request) {
-  return handler(await request.json());
+
+export async function POST(req) {
+  return handler(req);
 }

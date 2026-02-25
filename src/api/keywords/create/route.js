@@ -1,28 +1,31 @@
-async function handler({ keyword, projectId }) {
-  console.log("Adding keyword:", { keyword, projectId });
+import catalyst from 'zcatalyst-sdk-node';
+import { NextResponse } from 'next/server';
+
+async function handler(req) {
+  const { keyword, projectId } = await req.json();
 
   if (!keyword) {
-    throw new Error("Keyword is required");
+    return NextResponse.json({ error: "Keyword is required" }, { status: 400 });
   }
 
   if (!projectId) {
-    throw new Error("Project ID is required");
+    return NextResponse.json({ error: "Project ID is required" }, { status: 400 });
   }
 
   try {
-    const result = await sql`
-      INSERT INTO keywords (keyword, project_id)
-      VALUES (${keyword}, ${projectId})
-      RETURNING *
-    `;
-
-    console.log("Added keyword:", result[0]);
-    return result[0];
+    const app = catalyst.initialize(req);
+    const table = app.datastore().table('keywords');
+    const result = await table.insertRow({ 
+      keyword: keyword, 
+      project_id: projectId 
+    });
+    return NextResponse.json({ id: result.ROWID, keyword: result.keyword, project_id: result.project_id });
   } catch (error) {
     console.error("Error adding keyword:", error);
-    throw new Error("Failed to add keyword");
+    return NextResponse.json({ error: "Failed to add keyword" }, { status: 500 });
   }
 }
-export async function POST(request) {
-  return handler(await request.json());
+
+export async function POST(req) {
+  return handler(req);
 }

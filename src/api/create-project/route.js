@@ -1,35 +1,35 @@
-async function handler({ website }) {
+import catalyst from 'zcatalyst-sdk-node';
+import { NextResponse } from 'next/server';
+
+async function handler(req, res) {
+  const { website } = await req.json();
+
   if (!website) {
-    return { error: "Website URL is required" };
+    return NextResponse.json({ error: "Website URL is required" }, { status: 400 });
   }
 
   let websiteUrl = website.trim();
-
-  // Normalize the URL
   if (!websiteUrl.startsWith("http://") && !websiteUrl.startsWith("https://")) {
     websiteUrl = "https://" + websiteUrl;
   }
 
-  // Validate URL format
   try {
     new URL(websiteUrl);
   } catch {
-    return { error: "Invalid website URL format" };
+    return NextResponse.json({ error: "Invalid website URL format" }, { status: 400 });
   }
 
   try {
-    const result = await sql`
-      INSERT INTO projects (website)
-      VALUES (${websiteUrl})
-      RETURNING *
-    `;
-
-    return result[0];
+    const app = catalyst.initialize(req);
+    const table = app.datastore().table('projects');
+    const result = await table.insertRow({ website: websiteUrl });
+    return NextResponse.json({ id: result.ROWID, website: result.website });
   } catch (error) {
     console.error("Project creation error:", error);
-    return { error: "Failed to create project in database" };
+    return NextResponse.json({ error: "Failed to create project" }, { status: 500 });
   }
 }
-export async function POST(request) {
-  return handler(await request.json());
+
+export async function POST(req) {
+  return handler(req);
 }
