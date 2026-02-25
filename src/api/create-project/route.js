@@ -20,7 +20,7 @@ async function handler(req, res) {
   }
 
   try {
-    const app = catalyst.initialize(req);
+    const app = catalyst.initialize(null, { scope: 'admin' });
     const table = app.datastore().table('projects');
     const result = await table.insertRow({ website: websiteUrl });
     return NextResponse.json({ id: result.ROWID, website: result.website });

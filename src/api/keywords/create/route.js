@@ -13,7 +13,7 @@ async function handler(req) {
   }
 
   try {
-    const app = catalyst.initialize(req);
+    const app = catalyst.initialize(null, { scope: 'admin' });
     const table = app.datastore().table('keywords');
     const result = await table.insertRow({ 
       keyword: keyword, 

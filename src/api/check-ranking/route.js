@@ -9,7 +9,7 @@ async function handler(req) {
   }
 
   try {
-    const app = catalyst.initialize(req);
+    const app = catalyst.initialize(null, { scope: 'admin' });
     const zcql = app.zcql();
     const rankingsTable = app.datastore().table('keyword_rankings');
     const keywordsTable = app.datastore().table('keywords');
